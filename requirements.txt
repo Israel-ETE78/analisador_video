@@ -2,4 +2,3 @@ streamlit
 ffmpeg-python
 openai
 pytube
-pydub

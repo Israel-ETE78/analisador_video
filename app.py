@@ -3,7 +3,7 @@ import ffmpeg # Para manipulação de vídeo (extração de áudio) - SUBSTITUI 
 import openai # Para interagir com as APIs da OpenAI (GPT-4o e Whisper)
 from pytube import YouTube # Para baixar vídeos do YouTube
 import os # Para operações de sistema de arquivos (criar/deletar arquivos temporários)
-from pydub import AudioSegment # Para manipulação de áudio, se necessário (ex: conversão)
+# from pydub import AudioSegment # Não está sendo usado diretamente no fluxo principal com ffmpeg-python
 
 # Configurar a chave da API da OpenAI de forma segura
 # O Streamlit automaticamente carrega as chaves do .streamlit/secrets.toml
