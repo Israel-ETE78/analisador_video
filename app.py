@@ -155,7 +155,7 @@ st.header("3. Faça Perguntas sobre o Conteúdo do Vídeo")
 if "full_transcript" in st.session_state and st.session_state["full_transcript"]:
     user_question = st.text_input("Digite sua pergunta sobre o vídeo (ex: 'Qual é o principal argumento?', 'Quem são os personagens?', 'O que acontece no final?'):")
 
-    if st.button("💬 Pergunte Sobre o Video", type="secondary"):
+    if st.button("💬 Obter Resposta", type="secondary"):
         if user_question:
             with st.spinner("🤖 Gerando resposta com GPT-4o..."):
                 prompt_qa = f"""
