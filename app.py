@@ -15,7 +15,7 @@ except KeyError:
 
 st.set_page_config(layout="wide", page_title="Analisador de Vídeos Inteligente")
 
-st.title("🎬 Jarvis IA Analisador de Vídeos Inteligente")
+st.title("🎬 Jarvis - Analisador de Vídeos Inteligente")
 st.markdown("""
 Extraia a narrativa, enredo, diálogo ou contexto semântico de vídeos
 e faça perguntas sobre o conteúdo!
