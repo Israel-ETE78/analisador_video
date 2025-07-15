@@ -3,11 +3,12 @@ import ffmpeg
 import openai
 import yt_dlp
 import os
-import json # Para lidar com o arquivo JSON
-import bcrypt # Para hashing de senhas
+import json
+import bcrypt
+import requests # Novo import: para fazer requisições HTTP à API do GitHub
+import base64 # Novo import: para codificar/decodificar conteúdo para a API do GitHub
 
 # --- Constantes e Configurações ---
-USERS_FILE = "users.json"
 ADMIN_USERNAME = "israel" # Nome de usuário do administrador padrão
 DEFAULT_TEMP_PASSWORD = "senhareset" # Senha temporária padrão
 
@@ -16,6 +17,23 @@ try:
     openai.api_key = st.secrets["OPENAI_API_KEY"]
 except KeyError:
     st.error("Chave da API da OpenAI não encontrada. Por favor, adicione sua chave em .streamlit/secrets.toml (local) ou nos segredos do Streamlit Cloud.")
+    st.stop()
+
+# --- Configuração do GitHub para persistência ---
+try:
+    GITHUB_TOKEN = st.secrets["github"]["token"]
+    GITHUB_REPO_FULL_NAME = st.secrets["github"]["repo"] # Ex: "seu-usuario/seu-repositorio"
+    GITHUB_FILE_PATH = st.secrets["github"]["file_path"] # Ex: "users.json"
+
+    GITHUB_REPO_OWNER, GITHUB_REPO_NAME = GITHUB_REPO_FULL_NAME.split("/")
+    GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
+    
+    HEADERS = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+except KeyError as e:
+    st.error(f"Erro na configuração do GitHub nos segredos: {e}. Certifique-se de que 'github.token', 'github.repo' e 'github.file_path' estejam definidos em .streamlit/secrets.toml.")
     st.stop()
 
 st.set_page_config(layout="wide", page_title="Analisador de Vídeos Inteligente")
@@ -30,12 +48,64 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 
-# --- Funções de Gerenciamento de Usuários e Autenticação ---
+# --- Funções de Persistência com GitHub ---
+
+def get_file_from_github():
+    """
+    Busca o arquivo de usuários do GitHub.
+    Retorna (dados_json, sha) se encontrado, ou (None, None) se não.
+    """
+    try:
+        response = requests.get(GITHUB_API_URL, headers=HEADERS)
+        response.raise_for_status() # Lança exceção para erros HTTP (4xx ou 5xx)
+        data = response.json()
+        if "content" in data and "sha" in data:
+            file_content = base64.b64decode(data['content']).decode('utf-8')
+            return json.loads(file_content), data['sha']
+        return None, None
+    except requests.exceptions.RequestException as e:
+        if response.status_code == 404:
+            st.info(f"Arquivo '{GITHUB_FILE_PATH}' não encontrado no repositório GitHub. Será criado no primeiro salvamento.")
+        else:
+            st.error(f"Erro ao buscar arquivo do GitHub: {e}. Status: {response.status_code}, Resposta: {response.text}")
+        return None, None
+    except json.JSONDecodeError as e:
+        st.error(f"Erro ao decodificar JSON do arquivo GitHub: {e}. Conteúdo bruto: {file_content[:200]}...") # Mostra um pedaço do conteúdo
+        return None, None
+
+def put_file_to_github(content, sha=None, commit_message="Update users.json"):
+    """
+    Envia o conteúdo do arquivo de usuários para o GitHub.
+    Requer o SHA para atualizações.
+    """
+    encoded_content = base64.b64encode(json.dumps(content, indent=4).encode('utf-8')).decode('utf-8')
+    
+    payload = {
+        "message": commit_message,
+        "content": encoded_content
+    }
+    if sha:
+        payload["sha"] = sha # Necessário para atualizar arquivos existentes
+    
+    try:
+        response = requests.put(GITHUB_API_URL, headers=HEADERS, json=payload)
+        response.raise_for_status()
+        st.toast("Dados salvos no GitHub!") # Notificação menos intrusiva
+        return True
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao salvar arquivo no GitHub: {e}. Status: {response.status_code}, Resposta: {response.text}")
+        return False
+
+# --- Funções de Gerenciamento de Usuários e Autenticação (Modificadas para GitHub) ---
 
 def load_users():
-    """Carrega os usuários do arquivo JSON."""
-    if not os.path.exists(USERS_FILE):
-        # Se o arquivo não existe, cria um com o usuário admin padrão (com senha temporária)
+    """Carrega os usuários do GitHub. Se não existir, inicializa e tenta salvar."""
+    users_data, sha = get_file_from_github()
+    if users_data:
+        st.session_state.github_file_sha = sha # Armazena o SHA para salvar depois
+        return users_data
+    else:
+        # Se o arquivo não existe no GitHub, inicializa um conjunto de usuários
         initial_users = {
             ADMIN_USERNAME: {
                 "password_hash": bcrypt.hashpw(DEFAULT_TEMP_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
@@ -44,17 +114,39 @@ def load_users():
                 "reset_by_admin": False
             }
         }
-        with open(USERS_FILE, "w") as f:
-            json.dump(initial_users, f, indent=4)
-        return initial_users
-    
-    with open(USERS_FILE, "r") as f:
-        return json.load(f)
+        # Tenta salvar este conjunto inicial no GitHub imediatamente
+        if put_file_to_github(initial_users, commit_message="Initial users.json creation"):
+            st.success("Arquivo de usuários inicial criado com sucesso no GitHub.")
+            # Após criar, busque o SHA recém-gerado para futuras atualizações
+            _, new_sha = get_file_from_github() 
+            st.session_state.github_file_sha = new_sha
+            return initial_users
+        else:
+            st.error("Falha ao criar arquivo de usuários inicial no GitHub. Os dados não serão persistidos.")
+            return initial_users # Retorna dados em memória se a persistência falhar
 
 def save_users(users):
-    """Salva os usuários no arquivo JSON."""
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+    """Salva os usuários no GitHub."""
+    current_sha = st.session_state.get("github_file_sha")
+    if current_sha:
+        if put_file_to_github(users, sha=current_sha):
+            # Importante: Após uma atualização bem-sucedida, o SHA do arquivo muda.
+            # É necessário buscar o novo SHA para futuras operações.
+            # Isso também ajuda a lidar com possíveis modificações externas no GitHub.
+            _, new_sha = get_file_from_github() 
+            st.session_state.github_file_sha = new_sha
+            return True
+        else:
+            return False
+    else:
+        # Tentar criar o arquivo se o SHA não estiver presente (pode ser o primeiro salvamento)
+        st.warning("SHA do arquivo não encontrado. Tentando criar o arquivo no GitHub.")
+        if put_file_to_github(users, commit_message="Create users.json - fallback"):
+            _, new_sha = get_file_from_github() 
+            st.session_state.github_file_sha = new_sha
+            return True
+        return False
+
 
 def hash_password(password):
     """Gera o hash de uma senha."""
@@ -93,7 +185,7 @@ def change_password_form(username, is_first_login=False):
     st.subheader("Alterar Senha")
     
     if st.session_state.get("is_password_reset_by_admin", False):
-        st.warning(f"Você deve ter feito login com a senha temporária '{DEFAULT_TEMP_PASSWORD}'. Por favor, defina uma nova senha forte e segura.")
+        st.warning(f"Sua senha foi redefinida pelo administrador. Você deve ter feito login com a senha temporária '{DEFAULT_TEMP_PASSWORD}'. Por favor, defina uma nova senha forte e segura.")
     elif is_first_login:
         st.warning("Esta é sua primeira conexão. Por favor, defina uma nova senha.")
     
@@ -158,9 +250,11 @@ def admin_page():
                     "first_login": True,
                     "reset_by_admin": False
                 }
-                save_users(users)
-                st.success(f"Usuário '{new_username}' criado com sucesso! A senha inicial é '{new_password}'.")
-                st.rerun()
+                if save_users(users): # Tenta salvar no GitHub
+                    st.success(f"Usuário '{new_username}' criado com sucesso! A senha inicial é '{new_password}'.")
+                    st.rerun()
+                else:
+                    st.error("Falha ao salvar o novo usuário no GitHub. Tente novamente.")
                 
     st.write("---")
 
@@ -186,18 +280,23 @@ def admin_page():
                     users[selected_username]["password_hash"] = hash_password(DEFAULT_TEMP_PASSWORD)
                     users[selected_username]["first_login"] = True
                     users[selected_username]["reset_by_admin"] = True # Define como resetado por admin
-                    save_users(users)
-                    st.success(f"Senha de '{selected_username}' redefinida para '{DEFAULT_TEMP_PASSWORD}'. Ele terá que trocá-la no próximo login.")
-                    st.rerun()
+                    if save_users(users): # Tenta salvar no GitHub
+                        st.success(f"Senha de '{selected_username}' redefinida para '{DEFAULT_TEMP_PASSWORD}'. Ele terá que trocá-la no próximo login.")
+                        st.rerun()
+                    else:
+                        st.error("Falha ao redefinir a senha no GitHub. Tente novamente.")
+
 
             if update_role_button:
                 if selected_username == st.session_state.username and new_role_edit != user_data["role"]:
                     st.warning("Você não pode alterar sua própria função enquanto estiver logado. Peça para outro administrador.")
                 else:
                     users[selected_username]["role"] = new_role_edit
-                    save_users(users)
-                    st.success(f"Função de '{selected_username}' atualizada para '{new_role_edit}'.")
-                    st.rerun()
+                    if save_users(users): # Tenta salvar no GitHub
+                        st.success(f"Função de '{selected_username}' atualizada para '{new_role_edit}'.")
+                        st.rerun()
+                    else:
+                        st.error("Falha ao atualizar a função no GitHub. Tente novamente.")
 
             if delete_user_button:
                 if selected_username == st.session_state.username:
@@ -206,16 +305,18 @@ def admin_page():
                     st.error("Não é possível excluir o único administrador.")
                 else:
                     del users[selected_username]
-                    save_users(users)
-                    st.success(f"Usuário '{selected_username}' excluído com sucesso.")
-                    st.rerun()
+                    if save_users(users): # Tenta salvar no GitHub
+                        st.success(f"Usuário '{selected_username}' excluído com sucesso.")
+                        st.rerun()
+                    else:
+                        st.error("Falha ao excluir o usuário no GitHub. Tente novamente.")
 
 
 # --- Interface Principal do Aplicativo ---
 
 def main_app():
     """Contém a lógica principal do analisador de vídeos."""
-    st.title("🎬 Jarvis - Analisador de Vídeos Inteligente")
+    st.title("🎬 Analisador de Vídeos Inteligente com GPT-4o")
     st.markdown("""
     Extraia a narrativa, enredo, diálogo ou contexto semântico de vídeos
     e faça perguntas sobre o conteúdo!
@@ -345,7 +446,7 @@ def main_app():
     if "full_transcript" in st.session_state and st.session_state["full_transcript"]:
         user_question = st.text_input("Digite sua pergunta sobre o vídeo (ex: 'Qual é o principal argumento?', 'Quem são os personagens?', 'O que acontece no final?'):")
 
-        if st.button("💬 Obter Resposta", type="secondary"):
+        if st.button("💬 Obter Resposta do GPT-4o", type="secondary"):
             if user_question:
                 with st.spinner("🤖 Gerando resposta com GPT-4o..."):
                     prompt_qa = f"""
@@ -396,6 +497,9 @@ if "first_login" not in st.session_state:
     st.session_state.first_login = None
 if "is_password_reset_by_admin" not in st.session_state:
     st.session_state.is_password_reset_by_admin = False
+# Adicionado para persistência do GitHub
+if "github_file_sha" not in st.session_state:
+    st.session_state.github_file_sha = None
 
 
 if st.session_state.logged_in:
@@ -430,9 +534,9 @@ if st.session_state.logged_in:
 else: # Não logado, mostra formulário de login
     st.title("Login")
 
-    # --- NOVO: Mensagem genérica para reset de senha na tela de login ---
+    # --- Mensagem genérica para reset de senha na tela de login ---
     st.info(f"Se sua senha foi redefinida por um administrador, use a senha temporária **'{DEFAULT_TEMP_PASSWORD}'** para fazer seu primeiro login e então defina uma nova senha.")
-    # --- FIM NOVO ---
+    # --- FIM Mensagem ---
 
     username = st.text_input("Usuário")
     password = st.text_input("Senha", type="password")
