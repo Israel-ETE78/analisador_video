@@ -16,22 +16,19 @@ dist/
 *.egg-info/
 .pytest_cache/
 
-# Arquivos específicos do Streamlit Cloud
-.streamlit/secrets.toml  # MUITO IMPORTANTE: Suas chaves de API NUNCA devem ir para o GitHub!
-
 # Arquivos temporários gerados pelo seu script
-*.mp4             # Vídeos baixados ou temporários
+*.mp4
 *.avi
 *.mov
 *.mkv
-*.mp3             # Áudios extraídos ou temporários
-temp_uploaded_video.* # Nome temporário do vídeo enviado
-temp_audio.mp3    # Nome temporário do áudio extraído
+*.mp3             
+temp_uploaded_video
+temp_audio.mp3
 
 # Arquivos de log, se houver
 *.log
 
 # Arquivos de sistema operacional (se você estiver em um Mac ou Linux)
 .DS_Store
-.ipynb_checkpoints/ # Se você usar Jupyter Notebooks
+.ipynb_checkpoints/
 .streamlit/secrets.toml
