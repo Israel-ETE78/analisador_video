@@ -2,3 +2,4 @@ streamlit
 ffmpeg-python
 openai
 pytube
+yt-dlp
