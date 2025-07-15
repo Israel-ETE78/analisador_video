@@ -34,3 +34,4 @@ temp_audio.mp3    # Nome temporário do áudio extraído
 # Arquivos de sistema operacional (se você estiver em um Mac ou Linux)
 .DS_Store
 .ipynb_checkpoints/ # Se você usar Jupyter Notebooks
+.streamlit/secrets.toml
