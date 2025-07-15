@@ -15,7 +15,7 @@ except KeyError:
 
 st.set_page_config(layout="wide", page_title="Analisador de Vídeos Inteligente")
 
-st.title("🎬 Analisador de Vídeos Inteligente com GPT-4o")
+st.title("🎬 Jarvis IA Analisador de Vídeos Inteligente")
 st.markdown("""
 Extraia a narrativa, enredo, diálogo ou contexto semântico de vídeos
 e faça perguntas sobre o conteúdo!
@@ -163,7 +163,7 @@ st.header("3. Faça Perguntas sobre o Conteúdo do Vídeo")
 if "full_transcript" in st.session_state and st.session_state["full_transcript"]:
     user_question = st.text_input("Digite sua pergunta sobre o vídeo (ex: 'Qual é o principal argumento?', 'Quem são os personagens?', 'O que acontece no final?'):")
 
-    if st.button("💬 Obter Resposta do GPT-4o", type="secondary"):
+    if st.button("💬 Obter Resposta", type="secondary"):
         if user_question:
             with st.spinner("🤖 Gerando resposta com GPT-4o..."):
                 prompt_qa = f"""
