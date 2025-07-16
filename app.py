@@ -561,8 +561,8 @@ if st.session_state.logged_in:
         main_app() # Sempre mostra o app principal para usuários normais
 
 else: # Não logado, mostra formulário de login
-    st.title("Login")
-
+    st.title("🎬 Jarvis - Analisador de Mídia Inteligente")
+    st.header("Faça Login para Continuar")
     st.info(f"Se sua senha foi redefinida por um administrador, use a senha temporária **'{DEFAULT_TEMP_PASSWORD}'** para fazer seu primeiro login e então defina uma nova senha.")
 
     username = st.text_input("Usuário")
