@@ -185,7 +185,7 @@ def change_password_form(username, is_first_login=False):
     st.subheader("Alterar Senha")
     
     if st.session_state.get("is_password_reset_by_admin", False):
-        st.warning(f"Sua senha foi redefinida pelo administrador. Você deve ter feito login com a senha temporária '{DEFAULT_TEMP_PASSWORD}'. Por favor, defina uma nova senha forte e segura.")
+        st.warning(f"Você deve ter feito login com a senha temporária '{DEFAULT_TEMP_PASSWORD}'. Por favor, defina uma nova senha forte e segura.")
     elif is_first_login:
         st.warning("Esta é sua primeira conexão. Por favor, defina uma nova senha.")
     
@@ -316,7 +316,7 @@ def admin_page():
 
 def main_app():
     """Contém a lógica principal do analisador de vídeos."""
-    st.title("🎬 Analisador de Vídeos Inteligente com GPT-4o")
+    st.title("🎬 Jarvis - Analisador de Vídeos Inteligente")
     st.markdown("""
     Extraia a narrativa, enredo, diálogo ou contexto semântico de vídeos
     e faça perguntas sobre o conteúdo!
@@ -446,9 +446,9 @@ def main_app():
     if "full_transcript" in st.session_state and st.session_state["full_transcript"]:
         user_question = st.text_input("Digite sua pergunta sobre o vídeo (ex: 'Qual é o principal argumento?', 'Quem são os personagens?', 'O que acontece no final?'):")
 
-        if st.button("💬 Obter Resposta do GPT-4o", type="secondary"):
+        if st.button("💬 Obter Resposta", type="secondary"):
             if user_question:
-                with st.spinner("🤖 Gerando resposta com GPT-4o..."):
+                with st.spinner("🤖 Gerando resposta..."):
                     prompt_qa = f"""
                     Com base no seguinte conteúdo do vídeo (transcrição completa) e na análise semântica já realizada,
                     responda à pergunta do usuário. Mantenha a resposta concisa, clara e diretamente relacionada ao conteúdo fornecido.
