@@ -8,6 +8,12 @@ import bcrypt
 import requests
 import base64
 
+# ✅ Nova forma correta de ler query params
+params = st.query_params
+
+if "ping" in params:
+    st.write("✅ Jarvis Lembrete está online!")
+    st.stop()
 # --- Constantes e Configurações ---
 ADMIN_USERNAME = "israel"
 DEFAULT_TEMP_PASSWORD = "senhareset"
