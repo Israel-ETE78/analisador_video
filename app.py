@@ -8,11 +8,10 @@ import bcrypt
 import requests
 import base64
 
-# ✅ Nova forma correta de ler query params
+# ✅ Bloco de "ping" para manter o app acordado
 params = st.query_params
-
 if "ping" in params:
-    st.write("✅ Jarvis Lembrete está online!")
+    st.write("✅ Analisador de vídeo da Jarvis está online!")
     st.stop()
 # --- Constantes e Configurações ---
 ADMIN_USERNAME = "israel"
